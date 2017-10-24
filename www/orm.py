@@ -5,9 +5,11 @@ import asyncio, logging
 
 import aiomysql
 
+# SQL语句反馈
 def log(sql, args=()):
     logging.info('SQL: %s' % sql)
-#创建连接池
+
+# 创建连接池
 async def create_pool(loop, **kw):
     logging.info('create database connection pool...')
     global __pool
@@ -23,7 +25,8 @@ async def create_pool(loop, **kw):
         minsize=kw.get('minsize', 1),
         loop=loop
     )
-#select语句
+
+# 单独封装select
 async def select(sql, args, size=None):
     log(sql, args)
     global __pool
@@ -36,7 +39,8 @@ async def select(sql, args, size=None):
                 rs = await cur.fetchall()
         logging.info('rows returned: %s' % len(rs))
         return rs
-#excute语句
+
+# 封装insert，update，delete
 async def execute(sql, args, autocommit=True):
     log(sql)
     async with __pool.get() as conn:
@@ -54,6 +58,7 @@ async def execute(sql, args, autocommit=True):
             raise
         return affected
 
+# 创建占位符，用于insert，updae，delete语句
 def create_args_string(num):
     L = []
     for n in range(num):
@@ -96,6 +101,7 @@ class TextField(Field):
     def __init__(self, name=None, default=None):
         super().__init__(name, 'text', False, default)
 
+#定义Metaclass元类
 class ModelMetaclass(type):
 
     def __new__(cls, name, bases, attrs):
@@ -211,17 +217,17 @@ class Model(dict, metaclass=ModelMetaclass):
         args.append(self.getValueOrDefault(self.__primary_key__))
         rows = await execute(self.__insert__, args)
         if rows != 1:
-            logging.warn('failed to insert record: affected rows: %s' % rows)
+            logging.warning('failed to insert record: affected rows: %s' % rows)
 
     async def update(self):
         args = list(map(self.getValue, self.__fields__))
         args.append(self.getValue(self.__primary_key__))
         rows = await execute(self.__update__, args)
         if rows != 1:
-            logging.warn('failed to update by primary key: affected rows: %s' % rows)
+            logging.warning('failed to update by primary key: affected rows: %s' % rows)
 
     async def remove(self):
         args = [self.getValue(self.__primary_key__)]
         rows = await execute(self.__delete__, args)
         if rows != 1:
-            logging.warn('failed to remove by primary key: affected rows: %s' % rows)
+            logging.warning('failed to remove by primary key: affected rows: %s' % rows)
